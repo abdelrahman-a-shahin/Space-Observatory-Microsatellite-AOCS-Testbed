@@ -1,2 +1,2 @@
 # Space-Observatory-Microsatellite-AOCS-Testbed
-My graduation project at Aerospace Engineering, New Mansoura University, in Egypt. 
+My graduation project at Aerospace Engineering, New Mansoura University, in Egypt. Going through the design, simulation, and implementation process of a ground model customized cube-sat for space observation. And to validate the CubeSat's attitude, navigation & control an AOCS testbed was made to simulate Earth's geomagnetic field and the frictionless motion of the satellite in space.
