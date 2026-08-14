@@ -1,0 +1,97 @@
+% LEO geomagnetic environment - simple dipole model + fluctuations
+clear; clc; close all;
+
+%% constants
+mu = 398600.4418;  % earth mu, km^3/s^2
+Re = 6371.2;       % earth radius, km
+B0 = 30000;        % surface field, nT
+tilt = 11.7;       % dipole tilt, deg
+we = 7.2921159e-5; % earth rotation rate, rad/s
+
+%% orbit setup
+alt = 550;              % km
+a = Re + alt;
+inc = deg2rad(97.6);    % sun sync-ish
+n = sqrt(mu/a^3);       % mean motion
+T = 2*pi/n;             % orbital period
+
+dt = 1;
+t = (0:dt:3*T)';
+N = length(t);
+
+theta = n*t;
+
+% orbit in ECI (circular, simple)
+x = a*cos(theta);
+y = a*sin(theta)*cos(inc);
+z = a*sin(theta)*sin(inc);
+r_eci = [x y z];
+
+% rotate to ECEF using earth spin
+gst = we*t;
+r_ecef = zeros(N,3);
+for k = 1:N
+    Rz = [cos(gst(k)) sin(gst(k)) 0;
+        -sin(gst(k)) cos(gst(k)) 0;
+        0 0 1];
+    r_ecef(k,:) = (Rz*r_eci(k,:)')';
+end
+
+%% dipole field
+m_hat = [sind(tilt) 0 cosd(tilt)]; % dipole axis, rough tilt
+
+B = zeros(N,3);
+for k = 1:N
+    rv = r_ecef(k,:);
+    rmag = norm(rv);
+    rhat = rv/rmag;
+    coef = B0*(Re/rmag)^3;
+    B(k,:) = coef*(3*dot(m_hat,rhat)*rhat - m_hat);
+end
+
+Bmag = vecnorm(B,2,2);
+
+%% add fluctuations
+rng(1);
+
+% slow storm-like drift (random walk-ish, mean reverting)
+tau = 1800; % sec
+sigma1 = 0.06;
+storm = zeros(N,1);
+for k = 2:N
+    storm(k) = storm(k-1) + (dt/tau)*(-storm(k-1)) + sigma1*sqrt(2*dt/tau)*randn;
+end
+
+% fast noise
+sigma2 = 0.01;
+noise = sigma2*randn(N,1);
+
+pert = storm + noise;
+B_pert = B.*(1+pert);
+Bmag_pert = vecnorm(B_pert,2,2);
+
+%% plots
+figure;
+subplot(3,1,1)
+plot(t/60,Bmag,'b'); hold on
+plot(t/60,Bmag_pert,'r')
+xlabel('time (min)'); ylabel('|B| (nT)')
+legend('clean dipole','with fluctuations')
+title('B field mag over orbit')
+grid on
+
+subplot(3,1,2)
+plot(t/60,B_pert(:,1),t/60,B_pert(:,2),t/60,B_pert(:,3))
+xlabel('time (min)'); ylabel('B comps (nT)')
+legend('Bx','By','Bz')
+grid on
+
+subplot(3,1,3)
+plot(t/60,pert*100)
+xlabel('time (min)'); ylabel('fluctuation %')
+title('fluctuation envelope')
+grid on
+
+% quick stats
+fprintf('mean |B| = %.1f nT\n', mean(Bmag_pert))
+fprintf('std |B| = %.1f nT (%.2f%%)\n', std(Bmag_pert), 100*std(Bmag_pert)/mean(Bmag_pert))
